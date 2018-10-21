@@ -34,7 +34,7 @@ MODULEALIGN_PATH = os.path.join(DATA_PATH, 'moduleAlign')
 CHECK_FILES = False
 
 # parse constants
-INTERACTION_THR = 900  # threshold for propper interaction score in string_db
+INTERACTION_THR = 921  # threshold for propper interaction score in string_db
 GO_REPORT_FREQ = 1000
 
 # power method constants
