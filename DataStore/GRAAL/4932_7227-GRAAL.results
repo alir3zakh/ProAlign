@@ -1,0 +1,10 @@
+Alpha used: 0.8
+Seed used for random number generator: 1533560706
+Graph1 has: 2437 nodes.
+Graph2 has: 2642 nodes.
+
+Graph1 has: 13719 edges.
+Graph2 has: 20994 edges.
+Node Correctness is: 0; which is 0% of nodes
+Edge Correctness is: 5944; which is 43.3268% of edges
+Interaction Correctness is: 0; which is 0% of edges

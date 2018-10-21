@@ -1,0 +1,255 @@
+#####################################################
+
+Written By: Rohit Singh (rsingh@mit.edu)
+            Chung-Shou Liao (shou@csail.mit.edu)
+
+#####################################################
+For details of the algorithm please see:
+
+IsoRankN: Spectral methods for global alignment
+of multiple protein networks
+
+Chung-Shou Liao, Kanghao Lu, Michael Baym, Rohit Singh,
+and Bonnie Berger.
+
+in Proc. of the 17th International Conference on
+Intelligent Systems for Molecular Biology (ISMB'09),
+invited to Bioinformatics, Vol 25 No. 12 (2009)
+pp. i253-i258.
+
+######################################################
+
+The executable isorank-n is compiled for Linux x86_64 platform.
+
+The program isorank-n (which have been developed based on isorank
+and multiway_kpartite) finds a global alignment of multiple input
+networks. Given multiple networks with N1, N2,..., Nk nodes each,
+it returns min(N1,N2,...,Nk) matches, each match corresponding to
+best-matching nodes from the multiple networks.
+
+To understand how to use the algorithm, let's start with an example of
+pairwise alignment of two input networks. The multiple case is similar.
+Look in the example/ directory (the data here is completely contrived!!):
+
+(1) Suppose the species are named 'A' and 'B'
+
+(2) Create the graph files and results from the BLAST runs (between the
+    nodes) in a single directory. You'll need 5 files:
+
+  (2.1) Network files:
+     You'll need A.tab and B.tab , tab-separated files
+     where each line contains an interaction. For example, the first 5 lines of
+     A.tab are:
+
+     ====== BEGIN ========
+     INTERACTOR_A INTERACTOR_B
+     a0 a1
+     a0 a2
+     a0 a3
+     a0 a4
+     ====== END ========
+
+      Columns are separated by tabs. The first line is a header line of the
+     form as shown above (the '_A' and '_B' in the header has nothing to do
+     with species names). All other lines describe an interaction, one per
+     line.
+
+     There may be a third column which contains edge
+     weights (0 < wt <= 1) and in that case the header line should've a third
+     column titled CONF_VAL. The code in the case of edge-weights is not
+     well-tested and may have bugs, so I'd recommend starting with
+     plain-vanilla, unweighted graphs.
+
+  (2.2) Results of BLAST runs.
+     You'll need to perform an all-vs-all run
+     of BLAST between all the nodes of the two networks. From these runs, I've
+     used the Bit-Score as the measure of similarity, but I'd imagine that
+     -log(E-value) should also work fine. You should store the results in 3 files:
+
+        A-B.evals,  A-A.evals, B-B.evals
+
+     The files contain, as their names indicate, the results of BLAST runs
+     between species A & B, A & A, and B & B, respectively. IMPORTANT: for
+     files containing Blast scores between two species, the filename should
+     have the species names in lexicographic order, i.e., A-B.evals is
+     expected, not B-A.evals.
+
+     The first 5 lines of the A-B.evals file are:
+
+     ====== BEGIN ========
+     a0      b0      1
+     a1      b1      1
+     a2      b2      1
+     a3      b3      1
+     a4      b4      1
+     ====== END ========
+
+     Each line is of the form:
+     <id1>  <id2>   <Bit-Score>
+
+     As you may have noticed, the files contain rather contrived scores.
+
+     IMPORTANT: In the file A-B.evals, the first column should contain
+     ========= IDs from species A and the second column, IDs from species B.
+
+     You could get away with not having the A-A.evals and B-B.evals file, but I'd
+     strongly recommend against it. Using the self-similarity Bit-Score for a
+     protein allows the algorithm to better calibrate/normalize its similarity
+     against other proteins.
+
+
+
+(3) Create a file that specifies the file locations, species names etc.
+   In example/, the file "data.inp" has the following format:
+
+   ====== BEGIN ======
+   /scratch/rsingh/work/phylo-networks/test/public/example
+   -
+   2
+   A
+   B
+   ======  END  ======
+
+   (i) The first line is the location of directory where all the data
+      files (see (2)) are located.
+   (ii) The second line should be a "-". You can change it to specify different
+      versions of data files, as I'll describe later (see (6))
+   (iii) The third line contains the number of species names listed in this
+      file. A single data.inp can specify data-locations for multiple species.
+      This may be useful when you want to do multiple pair-wise alignments.
+   (iv) The 'n' (here n=2) lines following it describe, one on each line,
+      the names of the species. The code uses this name, along with the
+      location in line #1 to create the path names of the data files
+      it should read.
+
+
+(4) Call the code. Here are samples:
+
+./isorank  --K 30 --thresh 1e-4 --alpha 0.9 --maxveclen 1000000 data.inp
+./multiway_kpartite  --K 30 --thresh 1e-4 --alpha 0.9 --maxveclen 1000000 data.inp
+./isorank-n  --K 30 --thresh 1e-4 --alpha 0.9 --maxveclen 1000000 data.inp
+
+ The options are as follows (you can also use the "-h" or "--help" flag):
+
+ --prefix: all the output files will have this prefix. You can also include a
+  directory path here: "--prefix /tmp/t1" will save files as /tmp/t1_XYZ
+
+ --alpha: the parameter that controls the relative weight of network and
+  sequence data. 0 => only sequence data, 1 => only network data. Avoid going
+  above 0.95 and below 0.2. The sweet-spot's usually around 0.6-0.8.
+
+ --o <final-cluster-file>: the output cluster file. The default filename is
+                           tmp_output_cluster.txt.
+
+ --unifblast: one cool thing I discovered is that the algorithm can make
+  fairly good alignments by just knowing if there's a BLAST hit between two
+  proteins, i.e., treating the scores as binary 0-1 values. You can tell the
+  algorithm to ignore the numerical BLAST values with this flag.
+
+ The next three parameters (K, thresh, maxveclen) have to do with eigenvalue
+ computation of the algorithm. For large PPI networks, the algorithm can
+ take a few hours and 1GB+ of RAM. Good values for these parameters could
+ help you get good results quickly. In future, I intend to improve this part
+ by using better numerical algorithms.
+
+ --K : max number of iterations you should run this for. Really depends on how
+   much time you have. When using sequence data as well, the numbers start
+   to gel around iteration #10 and
+   by iteration #20, you should have decent convergence. You shouldn't need
+   to go above 30 or so for large PPI networks. We recommend K=10 for isorank-n
+   on two-way alignment. For multiple (three species or more) alignment,
+   K=10 to 30 would be better.
+
+ --thresh : the threshold for L1 norm of the change in the principal
+   eigenvector (R, see paper) between iterations. This should be between
+   1e-3 to 1e-5. If the threshold is crossed before K is reached, the algo
+   will stop. Start with larger values of thresh (e.g., 1e-3) and depending
+   upon how you like the results, try smaller thresholds. You should
+   not need to go below 1e-5 (or 1e-4) for large PPI networks.
+
+ --maxveclen : since the eigenvalue computation is being performed on a
+   sparse matrix and the eigenvector R is also sparse, you can choose how many
+   non-zero entries you want. In each iteration, the algo will keep only
+   <maxveclen> of the largest values in R. For large-networks, going above
+   5 million or so shouldn't be necessary. Values as small as 200K-300K
+   may work for small networks. It depends on how much time you have, how
+   much memory you have etc. Also, if maxveclen is relatively small, you should
+   probably increase --thresh a bit.
+
+(5) Analyze the output
+
+   IGNORE ALL THE STUFF THAT THE PROGRAM WRITES TO STDOUT; it's all for
+   debugging (the code's not cleaned up yet).
+
+   With "--prefix t1" 5 files should've been produced:
+
+     t1_match-score.txt
+     t1_final_cluster.txt
+
+  <final_cluster.txt> contains clustering information, which says which protein is
+  assigned to which cluster.
+  <match-score.txt> are the matching scores for each protein pair.
+
+(6) Specifying multiple versions of the data files:
+ If you create other versions of the input data files, you can specify them
+ as follows.
+
+ Recall that the "data.inp" file looks as follows:
+
+   ====== BEGIN ======
+   /scratch/rsingh/work/phylo-networks/test/public/example
+   -
+   2
+   A
+   B
+   ======  END  ======
+
+ In "data-version2.inp" we change the second line from "-" to some other word
+ like "_version2"
+
+   ====== BEGIN ======
+   /scratch/rsingh/work/phylo-networks/test/public/example
+   _version2
+   2
+   A
+   B
+   ======  END  ======
+
+   Now, the data files searched for by the algorithm should've "_version2" as
+   a suffix in their basename (before the file type extension). So, instead
+   of "A.tab" and "A-B.evals", the code will now search for "A_version2.tab"
+   and  "A-B_version2.evals" instead.
+
+(7) Note that once you have *_match-score.txt, you can call the program isorank-n
+directly with the matching scores for each protein pair. That is,
+
+--scorefile <match-score-file> : the file containing pairwise scores
+     after doing network alignment. Forms input to k-partite clustering.
+
+For example,
+
+./isorank-n  --K 10 --thresh 1e-4 --alpha 0.6 --maxveclen 1000000 --scorefile five_match-score.txt --o final_cluster.txt five.inp
+
+Otherwise, the matching scores will be computed again while you run isorank-n.
+
+(8) With "--prefix *", in addition to *_match-score.txt, all of the *_species-name.txt
+files (for instance, say *_A.txt) which contain star-spread information respectively
+for each species should be produced.
+
+(9) Besides, if you have star-spread information respectively for each species
+(stars_species-name.txt or *_species-name.txt), then you can call the program
+isorank-n directly with star files similarly. That is,
+
+--readstar: loading exist star files.
+
+For example,
+
+./isorank-n  --K 10 --thresh 1e-4 --alpha 0.6 --maxveclen 1000000 --scorefile five_match-score.txt --readstar --o final_cluster.txt five.inp
+
+Otherwise, the star files will be computed again while you run isorank-n.
+
+(10) Regarding the running time, it possibly costs from a couple
+of hours to three days to obtain *_match-score.txt (functional
+similarity graph). In our case (on five eukaryotic networks)The
+star-spread method would cost less than five hours. The spectral
+graph partitioning would take less than five minutes.
